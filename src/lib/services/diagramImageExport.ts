@@ -167,8 +167,15 @@ export async function renderDiagramImage(
 }
 
 function toResult(entry: DiagramImageResult & { key: string }): DiagramImageResult {
-  const { key: _key, ...result } = entry;
-  return result;
+  return {
+    bytes: entry.bytes,
+    width: entry.width,
+    height: entry.height,
+    canvasWidth: entry.canvasWidth,
+    canvasHeight: entry.canvasHeight,
+    pixelWidth: entry.pixelWidth,
+    pixelHeight: entry.pixelHeight,
+  };
 }
 
 function buildCacheKey(

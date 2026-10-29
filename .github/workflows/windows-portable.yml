@@ -22,6 +22,10 @@ jobs:
     timeout-minutes: 60
 
     steps:
+      - name: Configure git line endings
+        shell: bash
+        run: git config --global core.autocrlf false
+
       - name: Checkout
         uses: actions/checkout@v5
 
