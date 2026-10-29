@@ -12,7 +12,11 @@ export async function writePngToClipboard(bytes: Uint8Array): Promise<boolean> {
   } catch {
     try {
       if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) return false;
-      const blob = new Blob([bytes], { type: 'image/png' });
+      const buffer = bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength,
+      ) as ArrayBuffer;
+      const blob = new Blob([buffer], { type: 'image/png' });
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
       return true;
     } catch {

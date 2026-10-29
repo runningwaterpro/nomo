@@ -1,4 +1,5 @@
 import { getDiagramRenderer } from '../editor-core/renderers';
+import type { DiagramRenderer } from './render';
 import type { MermaidThemeDefinition } from '../theme/types';
 
 /** 图表复制与 Word 导出共用的一次导出参数。 */
@@ -11,6 +12,8 @@ export interface DiagramImageOptions {
   padding?: number;
   theme?: MermaidThemeDefinition;
   useCache?: boolean;
+  /** 调用方自带渲染器时优先使用，避免依赖全局注册状态。 */
+  renderer?: DiagramRenderer;
 }
 
 export interface DiagramImageResult {
@@ -91,7 +94,7 @@ export async function renderDiagramImage(
     return toResult(cachedImage);
   }
 
-  const renderer = getDiagramRenderer();
+  const renderer = options.renderer ?? getDiagramRenderer();
   if (!renderer) throw new Error('diagram-renderer-unavailable');
 
   const rendered = await renderer.renderMermaid(code, { theme, signal: options.signal });

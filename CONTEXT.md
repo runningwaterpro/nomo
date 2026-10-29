@@ -144,6 +144,10 @@ _Avoid_: 图片公式、公式编辑器私有格式
 使用 fenced code block 中的 `mermaid` 语言标记表达的文本图表。
 _Avoid_: 手绘 SVG、外部图片图表
 
+**图表图片复制**:
+把当前 Mermaid 图表按导出主题重新渲染为 PNG 并写入系统剪贴板的行为；图片只含图表内容，不带编辑器控件。
+_Avoid_: 图片复制（图片块复制原文件字节）、带界面元素的截图
+
 **Callout（提示块）**:
 使用 GitHub Alert 语法（`> [!TYPE]`）表示的语义化提示容器，支持 note、tip、important、warning、caution 五种固定类型，语义模式渲染为带图标和随 **界面语言** 显示标题的卡片。
 _Avoid_: 自定义标题、折叠块、普通引用块自动转换

@@ -1,7 +1,12 @@
 import { readFileAsBase64 } from '../../../lib/desktop/tauriStorage';
 import { t } from '../../i18n';
 import { resolveImagePath } from '../exportImagePath';
-import { assertWordCanvasSize, WORD_CONTENT_WIDTH_PX, WORD_MEDIA_BUDGET, WordBudgetError, type WordMedia, type WordNode } from './protocol';
+import {
+  DiagramImageBudgetError,
+  DIAGRAM_EXPORT_THEME,
+  renderDiagramImage,
+} from '../../../lib/services/diagramImageExport';
+import { assertWordCanvasSize, WORD_CANVAS_PIXELS, WORD_MEDIA_BUDGET, WordBudgetError, type WordMedia, type WordNode } from './protocol';
 
 const TIMEOUT = 8_000;
 
@@ -128,6 +133,30 @@ async function rasterImage(blob: Blob, signal: AbortSignal): Promise<Omit<WordMe
 }
 
 async function renderSpecial(node: WordNode, signal: AbortSignal): Promise<Omit<WordMedia, 'id'>> {
+  if (node.type === 'mermaid_block') {
+    const { createMermaidDiagramRenderer } = await import('../../../lib/services/mermaidDiagramRenderer');
+    try {
+      const result = await withWordAbort(
+        renderDiagramImage(String(node.attrs?.code ?? ''), {
+          signal,
+          renderer: createMermaidDiagramRenderer(),
+          theme: DIAGRAM_EXPORT_THEME,
+          pixelRatio: 2,
+          padding: 4,
+          backgroundColor: '#ffffff',
+          maxPixelArea: WORD_CANVAS_PIXELS,
+          useCache: false,
+        }),
+        signal,
+        30_000,
+      );
+      return { bytes: result.bytes, type: 'png', width: result.width, height: result.height };
+    } catch (error) {
+      if (error instanceof DiagramImageBudgetError) throw new WordBudgetError('canvas');
+      throw error;
+    }
+  }
+
   const holder = document.createElement('div');
   holder.dataset.nomoWordResource = '';
   holder.style.cssText = 'position:fixed;left:-100000px;top:0;pointer-events:none;';
@@ -139,23 +168,7 @@ async function renderSpecial(node: WordNode, signal: AbortSignal): Promise<Omit<
   root.append(element);
   document.body.append(holder);
   try {
-    if (node.type === 'mermaid_block') {
-      const { createMermaidDiagramRenderer } = await import('../../../lib/services/mermaidDiagramRenderer');
-      const result = await withWordAbort(createMermaidDiagramRenderer().renderMermaid(String(node.attrs?.code ?? ''), {
-        theme: { theme: 'default', themeVariables: { darkMode: 'false', background: '#ffffff', primaryTextColor: '#202124' } }, signal,
-      }), signal, 30_000);
-      if (result.error || !result.svg) throw new Error('diagram');
-      element.innerHTML = result.svg;
-      const svg = element.querySelector('svg');
-      if (!svg) throw new Error('diagram');
-      const box = svg.viewBox.baseVal;
-      const width = box.width || Number(svg.getAttribute('width')) || WORD_CONTENT_WIDTH_PX;
-      const height = box.height || Number(svg.getAttribute('height')) || width;
-      assertWordCanvasSize(width + 8, height + 8, 2);
-      svg.style.cssText = `width:${width}px;height:${height}px;max-width:none;`;
-      svg.setAttribute('width', String(width));
-      svg.setAttribute('height', String(height));
-    } else {
+    {
       const [{ default: katex }, { default: css }] = await Promise.all([import('katex'), import('virtual:nomo-katex-css')]);
       fontEmbedCSS = css;
       style = document.createElement('style');
