@@ -16,8 +16,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  verify:
+    name: Type check and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.5.1 --activate
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate paraglide messages
+        run: pnpm exec paraglide-js compile
+
+      - name: Type check
+        run: pnpm check
+
+      - name: Unit tests
+        run: pnpm test
+
   build:
     name: Build Windows x64 portable
+    needs: verify
     runs-on: windows-2022
     timeout-minutes: 60
 
@@ -52,12 +84,6 @@ jobs:
 
       - name: Generate paraglide messages
         run: pnpm exec paraglide-js compile
-
-      - name: Type check
-        run: pnpm check
-
-      - name: Unit tests
-        run: pnpm test
 
       - name: Build application without installer
         run: pnpm tauri build --no-bundle
