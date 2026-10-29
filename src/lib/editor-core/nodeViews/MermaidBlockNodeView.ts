@@ -7,8 +7,10 @@ import type { MermaidThemeDefinition } from '../../theme/types';
 import { registerActiveEdit, unregisterActiveEdit } from './activeEditRegistry';
 import { observeRenderVisibility, preserveRenderScrollAnchor } from './renderVisibility';
 import {
+  bindMermaidCopyButton,
   bindMermaidFullscreen,
   bindMermaidViewport,
+  type MermaidCopyBinding,
   type MermaidViewportBinding,
   type MermaidViewMode,
   type MermaidViewPosition,
@@ -16,6 +18,11 @@ import {
   normalizeRenderedMermaidViewport,
   type MermaidFullscreenBinding,
 } from '../../services/mermaidDiagramView';
+import {
+  clearDiagramImageCache,
+  renderDiagramImage,
+} from '../../services/diagramImageExport';
+import { writePngToClipboard } from '../../desktop/clipboardImage';
 
 /**
  * Mermaid 图表块 NodeView。
@@ -49,6 +56,7 @@ export class MermaidBlockNodeView {
   private previewSnapshotEl: HTMLElement | null = null;
   private editSurfaceEl: HTMLElement | null = null;
   private fullscreenBinding: MermaidFullscreenBinding | null = null;
+  private copyBinding: MermaidCopyBinding | null = null;
   private viewportBinding: MermaidViewportBinding | null = null;
   private viewMode: Exclude<MermaidViewMode, 'custom'> = 'readable';
   private viewPosition: MermaidViewPosition | undefined;
@@ -269,6 +277,7 @@ export class MermaidBlockNodeView {
     this.disposeFullscreen();
     this.cleanupEdit();
     this.unsubscribeLocale();
+    clearDiagramImageCache();
     MermaidBlockNodeView.instances.delete(this);
   }
 
@@ -684,15 +693,43 @@ export class MermaidBlockNodeView {
     toolbar.className = 'mermaid-view-toolbar';
     renderedEl.before(toolbar);
     this.bindViewport(renderedEl, toolbar, 'card');
-    this.fullscreenBinding = bindMermaidFullscreen(toolbar, renderedEl, {
-      ...this.viewLabels(),
-      open: t.fullscreenDiagram(),
-      dialog: t.fullscreenDiagramPreview(),
-      close: t.closeFullscreenDiagram(),
-      zoomIn: t.increaseZoom(),
-      zoomOut: t.decreaseZoom(),
-      reset: t.reset(),
-    });
+    this.copyBinding = bindMermaidCopyButton(toolbar, this.copyLabels(), () =>
+      this.copyDiagramToClipboard(),
+    );
+    this.fullscreenBinding = bindMermaidFullscreen(
+      toolbar,
+      renderedEl,
+      {
+        ...this.viewLabels(),
+        open: t.fullscreenDiagram(),
+        dialog: t.fullscreenDiagramPreview(),
+        close: t.closeFullscreenDiagram(),
+        zoomIn: t.increaseZoom(),
+        zoomOut: t.decreaseZoom(),
+        reset: t.reset(),
+      },
+      {
+        copy: { labels: this.copyLabels(), onCopy: () => this.copyDiagramToClipboard() },
+      },
+    );
+  }
+
+  private copyLabels() {
+    return { copy: t.copyImage(), copied: t.copied(), copyFailed: t.copyFailed() };
+  }
+
+  /** 复制当前图表为 PNG 图片；失败返回 false 由按钮呈现错误状态。 */
+  private async copyDiagramToClipboard(): Promise<boolean> {
+    if (this.destroyed || this.view.isDestroyed) return false;
+    const code = this.node.attrs.code as string;
+    if (!code.trim()) return false;
+    try {
+      const image = await renderDiagramImage(code);
+      if (this.destroyed) return false;
+      return await writePngToClipboard(image.bytes);
+    } catch {
+      return false;
+    }
   }
 
   private closeFullscreen(): void {
@@ -701,6 +738,8 @@ export class MermaidBlockNodeView {
 
   private disposeFullscreen(): void {
     this.disposeViewport();
+    this.copyBinding?.dispose();
+    this.copyBinding = null;
     this.fullscreenBinding?.dispose();
     this.fullscreenBinding = null;
   }

@@ -32,6 +32,25 @@ export interface MermaidFullscreenBinding {
   dispose(): void;
 }
 
+/** 复制图表图片按钮的界面文案。 */
+export interface MermaidCopyLabels {
+  copy: string;
+  copied: string;
+  copyFailed: string;
+}
+
+export interface MermaidCopyBinding {
+  button: HTMLButtonElement;
+  dispose(): void;
+}
+
+export interface MermaidFullscreenOptions {
+  copy?: {
+    labels: MermaidCopyLabels;
+    onCopy: () => Promise<boolean>;
+  };
+}
+
 const FULLSCREEN_MIN_SCALE = 0.1;
 const FULLSCREEN_MAX_SCALE = 3;
 const FULLSCREEN_SCALE_STEP = 0.1;
@@ -393,6 +412,7 @@ export function bindMermaidFullscreen(
   host: HTMLElement,
   renderedContent: HTMLElement,
   labels: MermaidFullscreenLabels,
+  options: MermaidFullscreenOptions = {},
 ): MermaidFullscreenBinding {
   const button = createIconButton(
     'mermaid-block-fullscreen-button',
@@ -408,7 +428,7 @@ export function bindMermaidFullscreen(
     viewer?.close();
     viewer = openMermaidFullscreen(renderedContent, button, labels, () => {
       viewer = null;
-    });
+    }, options);
   };
   button.addEventListener('click', open);
   host.appendChild(button);
@@ -429,6 +449,22 @@ export function bindMermaidFullscreen(
 }
 
 /**
+ * 创建图表卡片上的复制按钮。
+ *
+ * 反馈行为与代码块复制按钮一致：成功换对勾并在 1.2 秒后复原，
+ * 失败保留图标并加错误样式，1.5 秒后复原；不弹 toast。
+ */
+export function bindMermaidCopyButton(
+  host: HTMLElement,
+  labels: MermaidCopyLabels,
+  onCopy: () => Promise<boolean>,
+): MermaidCopyBinding {
+  const handle = createCopyButton('mermaid-block-copy-button', labels, onCopy);
+  host.appendChild(handle.button);
+  return { button: handle.button, dispose: handle.dispose };
+}
+
+/**
  * 创建并挂载一份全屏 Mermaid 查看器。
  *
  * @param renderedContent 原图的已渲染容器；函数只克隆节点，不移动或修改原图。
@@ -442,6 +478,7 @@ function openMermaidFullscreen(
   triggerButton: HTMLButtonElement,
   labels: MermaidFullscreenLabels,
   onClosed: () => void,
+  options: MermaidFullscreenOptions = {},
 ): { close(): void } {
   const overlayEl = document.createElement('div');
   overlayEl.className = 'mermaid-fullscreen-overlay';
@@ -489,6 +526,10 @@ function openMermaidFullscreen(
     labels.zoomIn,
     'plus',
   );
+  const copyHandle = options.copy
+    ? createCopyButton('mermaid-fullscreen-copy-button', options.copy.labels, options.copy.onCopy)
+    : null;
+  if (copyHandle) controlsEl.append(copyHandle.button);
   controlsEl.append(zoomOutButton, resetButton, zoomInButton);
 
   const zoomBadgeEl = document.createElement('div');
@@ -551,6 +592,7 @@ function openMermaidFullscreen(
       closed = true;
       document.removeEventListener('keydown', onKeydown);
       viewportBinding.dispose();
+      copyHandle?.dispose();
       cancelAnimationFrame(focusFrame);
       overlayEl.remove();
       document.body.classList.remove('has-mermaid-fullscreen');
@@ -622,27 +664,106 @@ function openMermaidFullscreen(
  * @param icon 内置线性图标名称。
  * @returns 尚未挂载、未绑定业务事件的 `button` 元素。
  */
+type DiagramIcon = 'maximize' | 'close' | 'plus' | 'minus' | 'reset' | 'copy' | 'check';
+
+const DIAGRAM_ICON_PATHS: Record<DiagramIcon, string> = {
+  maximize:
+    '<path d="M15 3h6v6"/><path d="M21 3l-7 7"/><path d="M9 21H3v-6"/><path d="M3 21l7-7"/>',
+  close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
+  reset: '<path d="M4 12a8 8 0 1 0 2.34-5.66"/><path d="M4 4v6h6"/>',
+  copy:
+    '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+};
+
+function createIcon(icon: DiagramIcon): SVGElement {
+  const template = document.createElement('template');
+  template.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${DIAGRAM_ICON_PATHS[icon]}</svg>`;
+  return template.content.firstElementChild as SVGElement;
+}
+
 function createIconButton(
   className: string,
   ariaLabel: string,
   title: string,
-  icon: 'maximize' | 'close' | 'plus' | 'minus' | 'reset',
+  icon: DiagramIcon,
 ): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = className;
   button.setAttribute('aria-label', ariaLabel);
   button.title = title;
-  const paths: Record<typeof icon, string> = {
-    maximize:
-      '<path d="M15 3h6v6"/><path d="M21 3l-7 7"/><path d="M9 21H3v-6"/><path d="M3 21l7-7"/>',
-    close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
-    plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
-    minus: '<path d="M5 12h14"/>',
-    reset: '<path d="M4 12a8 8 0 1 0 2.34-5.66"/><path d="M4 4v6h6"/>',
-  };
-  button.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[icon]}</svg>`;
+  button.appendChild(createIcon(icon));
   return button;
+}
+
+interface CopyButtonHandle {
+  button: HTMLButtonElement;
+  dispose(): void;
+}
+
+function createCopyButton(
+  className: string,
+  labels: MermaidCopyLabels,
+  onCopy: () => Promise<boolean>,
+): CopyButtonHandle {
+  const button = createIconButton(className, labels.copy, labels.copy, 'copy');
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let pending = false;
+  let disposed = false;
+
+  const reset = () => {
+    timer = null;
+    if (disposed) return;
+    button.classList.remove('is-copied', 'is-copy-error');
+    button.title = labels.copy;
+    button.setAttribute('aria-label', labels.copy);
+    button.replaceChildren(createIcon('copy'));
+  };
+
+  const showFeedback = (copied: boolean) => {
+    if (disposed) return;
+    if (timer !== null) clearTimeout(timer);
+    button.classList.remove('is-copied', 'is-copy-error');
+    button.classList.add(copied ? 'is-copied' : 'is-copy-error');
+    const text = copied ? labels.copied : labels.copyFailed;
+    button.title = text;
+    button.setAttribute('aria-label', text);
+    button.replaceChildren(createIcon(copied ? 'check' : 'copy'));
+    timer = setTimeout(reset, copied ? 1200 : 1500);
+  };
+
+  const click = async (event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (pending || disposed) return;
+    pending = true;
+    button.setAttribute('aria-busy', 'true');
+    let copied = false;
+    try {
+      copied = await onCopy();
+    } catch {
+      copied = false;
+    }
+    pending = false;
+    if (disposed) return;
+    button.removeAttribute('aria-busy');
+    showFeedback(copied);
+  };
+
+  button.addEventListener('click', click);
+  return {
+    button,
+    dispose() {
+      disposed = true;
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      button.removeEventListener('click', click);
+      button.remove();
+    },
+  };
 }
 
 /** 将任意缩放值限制到查看器支持的安全范围。 */

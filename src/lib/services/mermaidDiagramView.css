@@ -4,8 +4,10 @@
 }
 
 .mermaid-block-fullscreen-button,
+.mermaid-block-copy-button,
 .mermaid-fullscreen-close-button,
-.mermaid-fullscreen-control-button {
+.mermaid-fullscreen-control-button,
+.mermaid-fullscreen-copy-button {
   display: inline-grid;
   place-items: center;
   width: 36px;
@@ -40,8 +42,10 @@
 }
 
 .mermaid-block-fullscreen-button:hover,
+.mermaid-block-copy-button:hover,
 .mermaid-fullscreen-close-button:hover,
-.mermaid-fullscreen-control-button:hover {
+.mermaid-fullscreen-control-button:hover,
+.mermaid-fullscreen-copy-button:hover {
   border-color: color-mix(in srgb, var(--md-editor-accent) 55%, var(--md-editor-border));
   background: color-mix(in srgb, var(--md-editor-accent) 12%, var(--md-editor-surface));
   color: var(--md-editor-accent);
@@ -49,14 +53,18 @@
 }
 
 .mermaid-block-fullscreen-button:active,
+.mermaid-block-copy-button:active,
 .mermaid-fullscreen-close-button:active,
-.mermaid-fullscreen-control-button:active {
+.mermaid-fullscreen-control-button:active,
+.mermaid-fullscreen-copy-button:active {
   transform: translateY(1px);
 }
 
 .mermaid-block-fullscreen-button:focus-visible,
+.mermaid-block-copy-button:focus-visible,
 .mermaid-fullscreen-close-button:focus-visible,
-.mermaid-fullscreen-control-button:focus-visible {
+.mermaid-fullscreen-control-button:focus-visible,
+.mermaid-fullscreen-copy-button:focus-visible {
   outline: 2px solid var(--md-editor-accent);
   outline-offset: 2px;
   opacity: 1;
@@ -64,8 +72,10 @@
 }
 
 .mermaid-block-fullscreen-button svg,
+.mermaid-block-copy-button svg,
 .mermaid-fullscreen-close-button svg,
-.mermaid-fullscreen-control-button svg {
+.mermaid-fullscreen-control-button svg,
+.mermaid-fullscreen-copy-button svg {
   width: 18px;
   height: 18px;
   stroke: currentColor;
@@ -338,12 +348,25 @@
   color: var(--md-editor-muted-fg, #666);
   text-align: right;
 }
-.mermaid-view-toolbar .mermaid-block-fullscreen-button {
+.mermaid-view-toolbar .mermaid-block-fullscreen-button,
+.mermaid-view-toolbar .mermaid-block-copy-button {
   position: static;
   width: 32px;
   height: 32px;
   opacity: 1;
   transform: none;
+}
+
+.mermaid-block-copy-button.is-copied,
+.mermaid-fullscreen-copy-button.is-copied {
+  border-color: color-mix(in srgb, var(--md-editor-accent) 60%, var(--md-editor-border));
+  color: var(--md-editor-accent);
+}
+
+.mermaid-block-copy-button.is-copy-error,
+.mermaid-fullscreen-copy-button.is-copy-error {
+  border-color: color-mix(in srgb, #d9534f 60%, var(--md-editor-border));
+  color: #d9534f;
 }
 .mermaid-fullscreen-controls {
   max-width: calc(100% - 24px);
