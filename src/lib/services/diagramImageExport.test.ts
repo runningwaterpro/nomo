@@ -14,8 +14,13 @@ vi.mock('html-to-image', () => ({ toBlob: toBlobMock }));
 
 const CODE = 'flowchart TD\n  A --> B';
 
+/** jsdom 的 Blob 不提供 arrayBuffer，测试桩只实现服务实际使用的契约。 */
 function pngBlob(size = 16): Blob {
-  return new Blob([new Uint8Array(size)], { type: 'image/png' });
+  const bytes = new Uint8Array(size);
+  return {
+    size,
+    arrayBuffer: async () => bytes.buffer.slice(0),
+  } as unknown as Blob;
 }
 
 function createRenderer(): DiagramRenderer & { renderMermaid: ReturnType<typeof vi.fn> } {
