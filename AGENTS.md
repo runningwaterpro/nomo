@@ -20,3 +20,17 @@
 - 怀疑引用保留时，用堆快照检查旧 DOM 和回调引用链；强制 GC 仅用于诊断，不作为正常运行内存数据。
 - 生命周期调整须覆盖撤销重做、选区与阅读位置、中文输入法、新建焦点、双栏、组合标签、异步图片插入、保存和导出。未完成的实机项明确标记待验证。
 - 代码变更按影响运行 `pnpm check`、`pnpm build` 及定向既有测试（`pnpm exec vitest run <文件>`）。仅修改文档时检查内容和差异即可，不扩展无关验证。
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on the fork `runningwaterpro/nomo`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout; the glossary is the upstream-maintained `CONTEXT.md`. See `docs/agents/domain.md`.
