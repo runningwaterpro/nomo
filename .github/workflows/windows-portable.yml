@@ -1,0 +1,88 @@
+name: Windows Portable
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - 'feat/**'
+      - 'ci/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-portable-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Windows x64 portable
+    runs-on: windows-2022
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.5.1 --activate
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate paraglide messages
+        run: pnpm exec paraglide-js compile
+
+      - name: Type check
+        run: pnpm check
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build application without installer
+        run: pnpm tauri build --no-bundle
+
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content -LiteralPath 'package.json' -Raw | ConvertFrom-Json).version
+          $zipRoot = Join-Path $env:RUNNER_TEMP 'nomo-x64'
+          $appDir = Join-Path $zipRoot 'Nomo'
+          $zipPath = Join-Path $env:GITHUB_WORKSPACE "Nomo_${version}_x64_portable.zip"
+
+          Remove-Item -LiteralPath $zipRoot -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $appDir | Out-Null
+
+          Copy-Item -LiteralPath 'src-tauri\target\release\nomo.exe' -Destination (Join-Path $appDir 'nomo.exe')
+          if (Test-Path -LiteralPath 'src-tauri\target\release\resources') {
+            Copy-Item -LiteralPath 'src-tauri\target\release\resources' -Destination (Join-Path $appDir 'resources') -Recurse
+          }
+
+          Compress-Archive -LiteralPath $appDir -DestinationPath $zipPath -Force
+          "NOMO_ZIP_PATH=$zipPath" >> $env:GITHUB_ENV
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nomo-x64-portable
+          path: ${{ env.NOMO_ZIP_PATH }}
+          retention-days: 14
+          if-no-files-found: error
